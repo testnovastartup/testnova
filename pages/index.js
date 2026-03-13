@@ -43,6 +43,7 @@ export default function Home() {
         .from('test_cases')
         .select('*')
         .eq('project_id', projectId)
+        .eq('requirement_id', requirementId)
         .order('created_at', { ascending: false })
 
       if (error) {
