@@ -1,59 +1,112 @@
-import OpenAI from "openai";
-import { supabase } from "../../lib/supabase";
+import OpenAI from 'openai'
+import { supabase } from '../../lib/supabase'
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
+  apiKey: process.env.OPENAI_API_KEY,
+})
 
 export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' })
+  }
 
-  const { requirementId } = req.body;
+  try {
+    const { requirementId } = req.body
 
-  const { data: requirement } = await supabase
-    .from("requirements")
-    .select("*")
-    .eq("id", requirementId)
-    .single();
+    if (!requirementId) {
+      return res.status(400).json({ error: 'requirementId is required' })
+    }
 
-  const prompt = `
+    const { data: requirement, error: requirementError } = await supabase
+      .from('requirements')
+      .select('*')
+      .eq('id', requirementId)
+      .single()
+
+    if (requirementError || !requirement) {
+      return res.status(404).json({
+        error: requirementError?.message || 'Requirement not found',
+      })
+    }
+
+    const prompt = `
 You are a senior QA architect.
 
 Analyze the following software requirement and assign a risk score from 1 to 10.
 
-Requirement:
-${requirement.title}
+Risk level mapping:
+- 1.0 to 3.9 = LOW
+- 4.0 to 6.4 = MEDIUM
+- 6.5 to 8.4 = HIGH
+- 8.5 to 10.0 = CRITICAL
 
-Description:
-${requirement.description}
+Requirement title:
+${requirement.title || ''}
 
-Return JSON:
+Requirement description:
+${requirement.description || ''}
 
+Return ONLY valid JSON in this exact format:
 {
- "risk_score": number,
- "risk_level": "LOW | MEDIUM | HIGH | CRITICAL",
- "reasons": ["reason1","reason2","reason3"]
+  "risk_score": 8.5,
+  "risk_level": "HIGH",
+  "reasons": ["reason 1", "reason 2", "reason 3"]
 }
-`;
+`
 
-  const completion = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
-    messages: [
-      { role: "user", content: prompt }
-    ],
-    temperature: 0.2
-  });
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      temperature: 0.2,
+      messages: [
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+    })
 
-  const result = JSON.parse(completion.choices[0].message.content);
+    const content = completion.choices?.[0]?.message?.content
 
-  await supabase
-    .from("risk_scores")
-    .insert({
-      requirement_id: requirementId,
-      risk_score: result.risk_score,
+    if (!content) {
+      throw new Error('OpenAI returned empty response')
+    }
+
+    let result
+    try {
+      result = JSON.parse(content)
+    } catch (parseError) {
+      console.error('Failed to parse AI response:', content)
+      throw new Error('AI response was not valid JSON')
+    }
+
+    const normalizedResult = {
+      risk_score: Number(result.risk_score),
       risk_level: result.risk_level,
-      reasons: result.reasons
-    });
+      reasons: Array.isArray(result.reasons) ? result.reasons : [],
+    }
 
-  res.status(200).json(result);
+    const payload = {
+      requirement_id: requirementId,
+      risk_score: normalizedResult.risk_score,
+      risk_level: normalizedResult.risk_level,
+      reasons: normalizedResult.reasons,
+    }
 
+    const { error: insertError } = await supabase
+      .from('risk_scores')
+      .insert(payload)
+
+    if (insertError) {
+      return res.status(500).json({
+        error: `Failed to save risk score: ${insertError.message}`,
+      })
+    }
+
+    return res.status(200).json(normalizedResult)
+  } catch (error) {
+    console.error('analyze-risk error:', error)
+    return res.status(500).json({
+      error: error.message || 'Internal server error',
+    })
+  }
 }
