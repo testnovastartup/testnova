@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
-import '../styles/globals.css'
 
 export default function Home() {
   const [loading, setLoading] = useState(false)
