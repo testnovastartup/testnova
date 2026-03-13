@@ -17,7 +17,7 @@ export default async function handler(req, res) {
 
   try {
     const { projectId, requirementId, title, description } = req.body
-
+    console.log('API BODY:', { projectId, requirementId, title, description })
     if (!projectId || !requirementId || !title || !description) {
       return res.status(400).json({
         error: 'Missing projectId, requirementId, title, or description',
@@ -71,7 +71,7 @@ Return only valid JSON array in this exact structure:
       steps: item.steps,
       expected_result: item.expected_result,
     }))
-
+    console.log('ROWS TO INSERT:', rows)
     const { data, error } = await supabase
       .from('test_cases')
       .insert(rows)
