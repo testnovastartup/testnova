@@ -5,6 +5,8 @@ export default function Home() {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [testCases, setTestCases] = useState([])
+  const [riskLoading, setRiskLoading] = useState(false)
+  const [riskResult, setRiskResult] = useState(null)
 
   // TODO: 把这里替换成你自己的真实 UUID
   const projectId = '06e0f905-e6ac-4198-97bd-b18633c7d4d6'
@@ -13,6 +15,37 @@ export default function Home() {
   const requirementTitle = 'User Login'
   const requirementDescription =
     'User should be able to login using email and password. System should validate credentials and create authenticated session.'
+
+  async function analyzeRisk() {
+    try {
+      setRiskLoading(true)
+      setMessage('Analyzing risk...')
+      setRiskResult(null)
+
+      const response = await fetch('/api/analyze-risk', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          requirementId,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to analyze risk')
+      }
+
+      setRiskResult(data)
+      setMessage('Risk analysis completed.')
+    } catch (error) {
+      setMessage(error.message)
+    } finally {
+      setRiskLoading(false)
+    }
+  }
 
   async function handleGenerate() {
     try {
@@ -70,11 +103,38 @@ export default function Home() {
           <p><strong>Title:</strong> {requirementTitle}</p>
           <p><strong>Description:</strong> {requirementDescription}</p>
 
-          <button className="button" onClick={handleGenerate} disabled={loading}>
-            {loading ? 'Generating...' : 'Generate Test Cases'}
-          </button>
+          <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
+            <button className="button" onClick={analyzeRisk} disabled={riskLoading}>
+              {riskLoading ? 'Analyzing...' : 'Analyze Risk'}
+            </button>
+
+            <button className="button" onClick={handleGenerate} disabled={loading}>
+              {loading ? 'Generating...' : 'Generate Test Cases'}
+            </button>
+          </div>
 
           {message && <p className="message">{message}</p>}
+        </div>
+
+        <div className="card">
+          <h2>Risk Analysis</h2>
+
+          {!riskResult ? (
+            <p>No risk analysis yet.</p>
+          ) : (
+            <div className="testCase">
+              <p><strong>Risk Score:</strong> {riskResult.risk_score}</p>
+              <p><strong>Risk Level:</strong> {riskResult.risk_level}</p>
+
+              <p><strong>Reasons:</strong></p>
+              <ul>
+                {Array.isArray(riskResult.reasons) &&
+                  riskResult.reasons.map((reason, index) => (
+                    <li key={index}>{reason}</li>
+                  ))}
+              </ul>
+            </div>
+          )}
         </div>
 
         <div className="card">
