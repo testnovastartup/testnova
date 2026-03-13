@@ -88,7 +88,7 @@ Return ONLY valid JSON in this exact format:
     const payload = {
       requirement_id: requirementId,
       project_id: requirement.project_id,
-      score: normalizedResult.risk_score,
+      score: Math.round(normalizedResult.risk_score),
       explanation: normalizedResult.risk_level,
       reasons: normalizedResult.reasons,
     }
