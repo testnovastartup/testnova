@@ -66,6 +66,7 @@ Return only valid JSON array in this exact structure:
 
     const rows = parsed.map((item) => ({
       project_id: projectId,
+      requirement_id: requirementId,
       title: item.title,
       steps: item.steps,
       expected_result: item.expected_result,
